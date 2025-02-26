@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import ComparisonChart from './ComparisonChart';
 import './styles.css';
 
-// 初始费用种类
 const defaultExpenses = [
     { id: 1, category: 'Water Bill', amount: 0 },
     { id: 2, category: 'Electricity Bill', amount: 0 },
@@ -14,7 +14,7 @@ interface Expense {
     amount: number;
 }
 
-interface CalculationRecord {
+export interface CalculationRecord {
     id: number;
     timestamp: number;
     expenses: Expense[];
@@ -32,8 +32,9 @@ const Calculator: React.FC = () => {
     const [advanced, setAdvanced] = useState<boolean>(false);
     const [percentages, setPercentages] = useState<number[]>([]);
     const [records, setRecords] = useState<CalculationRecord[]>([]);
+    const [selectedRecordIds, setSelectedRecordIds] = useState<number[]>([]);
+    const [showComparison, setShowComparison] = useState<boolean>(false);
 
-    // 加载本地记录
     useEffect(() => {
         const storedRecords = localStorage.getItem('calculationRecords');
         if (storedRecords) {
@@ -41,17 +42,14 @@ const Calculator: React.FC = () => {
         }
     }, []);
 
-    // 当记录发生变化时，保存到本地
     useEffect(() => {
         localStorage.setItem('calculationRecords', JSON.stringify(records));
     }, [records]);
 
-    // 更新费用项数值
     const handleExpenseChange = (id: number, value: number) => {
         setExpenses(expenses.map(exp => exp.id === id ? { ...exp, amount: value } : exp));
     };
 
-    // 添加新费用种类
     const addCategory = () => {
         if (newCategory.trim() === '') return;
         const newId = expenses.length > 0 ? Math.max(...expenses.map(exp => exp.id)) + 1 : 1;
@@ -59,12 +57,10 @@ const Calculator: React.FC = () => {
         setNewCategory('');
     };
 
-    // 删除费用种类
     const deleteCategory = (id: number) => {
         setExpenses(expenses.filter(exp => exp.id !== id));
     };
 
-    // 当高级模式开启且人数大于0时，初始化或更新百分比分配
     useEffect(() => {
         if (advanced && people > 0) {
             const equalPercentage = parseFloat((100 / people).toFixed(2));
@@ -72,7 +68,6 @@ const Calculator: React.FC = () => {
         }
     }, [people, advanced]);
 
-    // 计算总费用及各自应付金额，并保存记录到本地
     const calculate = () => {
         const total = expenses.reduce((sum, exp) => sum + exp.amount, 0);
         let calculatedResult = '';
@@ -108,7 +103,6 @@ const Calculator: React.FC = () => {
         setRecords([...records, newRecord]);
     };
 
-    // 清零当前数据（保留费用种类）
     const clearValues = () => {
         setExpenses(expenses.map(exp => ({ ...exp, amount: 0 })));
         setPeople(0);
@@ -117,7 +111,6 @@ const Calculator: React.FC = () => {
         setPercentages([]);
     };
 
-    // 恢复初始状态（包括费用种类）
     const restoreDefaults = () => {
         setExpenses(defaultExpenses);
         setPeople(0);
@@ -127,7 +120,6 @@ const Calculator: React.FC = () => {
         setPercentages([]);
     };
 
-    // 加载某条记录，更新当前状态
     const loadRecord = (record: CalculationRecord) => {
         setExpenses(record.expenses.map(exp => ({ ...exp })));
         setPeople(record.people);
@@ -137,10 +129,20 @@ const Calculator: React.FC = () => {
         setNewCategory('');
     };
 
-    // 删除指定记录
     const deleteRecord = (id: number) => {
         setRecords(records.filter(record => record.id !== id));
+        setSelectedRecordIds(selectedRecordIds.filter(rid => rid !== id));
     };
+
+    const handleSelectRecord = (id: number, checked: boolean) => {
+        if (checked) {
+            setSelectedRecordIds([...selectedRecordIds, id]);
+        } else {
+            setSelectedRecordIds(selectedRecordIds.filter(rid => rid !== id));
+        }
+    };
+
+    const selectedRecords = records.filter(record => selectedRecordIds.includes(record.id));
 
     return (
         <div className="calculator-container">
@@ -211,16 +213,31 @@ const Calculator: React.FC = () => {
                     <h2>Saved Records</h2>
                     {records.map(record => (
                         <div className="record" key={record.id}>
-                            <span>
-                                {new Date(record.timestamp).toLocaleString()} - {record.result}
-                            </span>
+                            <div className="record-info">
+                                <input
+                                    type="checkbox"
+                                    checked={selectedRecordIds.includes(record.id)}
+                                    onChange={(e) => handleSelectRecord(record.id, e.target.checked)}
+                                />
+                                <span>
+                                    {new Date(record.timestamp).toLocaleString()} - {record.result}
+                                </span>
+                            </div>
                             <div className="record-actions">
                                 <button onClick={() => loadRecord(record)} className="load-btn">Load</button>
                                 <button onClick={() => deleteRecord(record.id)} className="delete-record-btn">Delete</button>
                             </div>
                         </div>
                     ))}
+                    {selectedRecordIds.length > 0 && (
+                        <button onClick={() => setShowComparison(true)} className="compare-btn">
+                            Compare Selected Records
+                        </button>
+                    )}
                 </div>
+            )}
+            {showComparison && selectedRecords.length > 0 && (
+                <ComparisonChart records={selectedRecords} />
             )}
         </div>
     );
